@@ -57,8 +57,21 @@ with stacked daily bars.
 
 ## Install
 
+Download the latest build from
+[Releases](https://github.com/ctudoudou/Perch/releases), unzip, and move
+`Perch.app` to `/Applications`.
+
+The app is ad-hoc signed rather than notarized, so macOS will refuse it on first
+launch. Clear the quarantine flag once:
+
 ```bash
-./build-app.sh release
+xattr -d com.apple.quarantine /Applications/Perch.app
+```
+
+Or build it yourself, which sidesteps quarantine entirely:
+
+```bash
+./build-app.sh release --universal
 open build/Perch.app
 ```
 

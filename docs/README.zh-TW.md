@@ -46,8 +46,18 @@ Session 數、訊息數、token、活躍天數、連續天數、尖峰時段與�
 
 ## 安裝
 
+到 [Releases](https://github.com/ctudoudou/Perch/releases) 下載，解壓縮後把 `Perch.app` 移到 `/Applications`。
+
+這個 App 只有 ad-hoc 簽名、未經 Apple 公證，所以首次開啟時 macOS 會擋下來。清一次隔離屬性即可：
+
 ```bash
-./build-app.sh release
+xattr -d com.apple.quarantine /Applications/Perch.app
+```
+
+或者自己建置，完全不會有隔離問題：
+
+```bash
+./build-app.sh release --universal
 open build/Perch.app
 ```
 
