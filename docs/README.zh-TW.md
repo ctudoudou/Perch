@@ -19,13 +19,17 @@ Claude Code 與 Codex，始終在餘光可及之處——
 
 ## 安裝
 
-[**下載 Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) → 解壓縮 → 拖進 `/Applications`。
-
-它沒有經過 Apple 公證——我沒有付費開發者帳號——所以首次開啟時 macOS 會隔離它，而且只給你「移到垃圾桶」這一個選項。清一次隔離屬性，之後就能正常開啟：
+1. [**下載 Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest)，解壓縮。
+2. 把 `Perch.app` 拖進 `/Applications`。
+3. 開啟**之前**，先執行這一行：
 
 ```bash
-xattr -d com.apple.quarantine /Applications/Perch.app
+xattr -cr /Applications/Perch.app
 ```
+
+然後就跟一般 App 一樣開啟即可。
+
+第 3 步不能省。Perch 未經 Apple 公證，macOS 會把 bundle 裡的**每一個檔案**都標記為隔離，並且告訴你「App 已損毀」、只給「移到垃圾桶」的選項。`xattr -cr` 會清掉整個 bundle——只清最外層的話，裡面的執行檔仍然被標記，App 照樣打不開。
 
 需要 macOS 14 以上。Universal binary，Apple silicon 與 Intel 皆可。
 

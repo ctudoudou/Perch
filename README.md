@@ -19,15 +19,20 @@ who's working, who's waiting on you, and how much quota is left.
 
 ## Install
 
-[**Download Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) → unzip → drag to `/Applications`.
-
-It isn't notarized — I don't have a paid Apple account — so macOS quarantines it
-on first launch and offers only *Move to Bin*. Clear the flag once and it opens
-normally from then on:
+1. [**Download Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) and unzip it.
+2. Drag `Perch.app` into `/Applications`.
+3. Run this once, **before** opening it:
 
 ```bash
-xattr -d com.apple.quarantine /Applications/Perch.app
+xattr -cr /Applications/Perch.app
 ```
+
+Then launch it like any other app.
+
+Step 3 is not optional. Perch isn't notarized, so macOS marks every file inside
+the bundle as quarantined and will tell you the app is damaged, offering only
+*Move to Bin*. `xattr -cr` clears the whole bundle — clearing just the top level
+leaves the binary flagged and the app still won't open.
 
 macOS 14 or later. Universal, Apple silicon and Intel.
 
