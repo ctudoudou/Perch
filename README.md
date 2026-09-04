@@ -1,17 +1,17 @@
 <div align="center">
 
-<img src="docs/images/icon.png" width="120" alt="Perch">
+<img src="docs/images/icon.png" width="112" alt="Perch">
 
 # Perch
 
-**Your coding agents, perched on the notch.**
+### Your coding agents, perched on the notch.
 
-Claude Code and Codex, at a glance — who's working, who's waiting for you,
-and how much of your quota is left.
+Claude Code and Codex, always in the corner of your eye —
+who's working, who's waiting on you, and how much quota is left.
 
 [繁體中文](docs/README.zh-TW.md) · macOS 14+ · MIT
 
-<img src="docs/images/collapsed.png" width="420" alt="The collapsed state hugging the notch">
+<img src="docs/images/collapsed.png" width="440" alt="Perch sitting on the notch">
 
 </div>
 
@@ -21,168 +21,128 @@ and how much of your quota is left.
 
 [**Download Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) → unzip → drag to `/Applications`.
 
-It is not notarized, so macOS quarantines it on first launch and offers only
-"Move to Bin". Clear the flag once and it opens normally from then on:
+It isn't notarized — I don't have a paid Apple account — so macOS quarantines it
+on first launch and offers only *Move to Bin*. Clear the flag once and it opens
+normally from then on:
 
 ```bash
 xattr -d com.apple.quarantine /Applications/Perch.app
 ```
 
-macOS 14 or later, Apple silicon and Intel.
+macOS 14 or later. Universal, Apple silicon and Intel.
 
 ---
 
-## What it does
+## Why
 
-Two small clusters hug the physical notch, leaving the cutout itself clear. A
-pulsing dot and a count on the left; a tinted badge per tool on the right,
-dimmed when idle and dotted when something needs you.
+I kept losing track of my own agents.
 
-Point at it and the panel drops down.
+You give Claude Code something long, switch to another window, and forget about
+it. Meanwhile Codex is running somewhere else. Ten minutes later you're tabbing
+around trying to work out which one is still thinking, which one has been
+waiting on you the whole time, and whether you're about to hit a limit.
 
-<img src="docs/images/tasks.png" width="620" alt="The Tasks panel">
+The notch is dead space that's already in your eyeline. Perch puts the answer
+there.
 
-Every session with its state, project, branch, context gauge and the last few
-turns. Click a row to expand it; click the arrow to jump straight to the app.
+## At rest
 
-The hover target is the notch strip and those clusters — **not** the whole
-window — so pointing anywhere near the middle of the screen does nothing.
+Two small clusters hug the notch and leave the cutout itself clear: a pulsing
+dot and a count on the left, a badge per tool on the right — dimmed when idle,
+with a small marker when something needs you.
 
-## Usage and quota
+That's all it does until you look at it. Point at the notch and the panel drops
+down.
 
-<img src="docs/images/usage.png" width="620" alt="The Usage panel">
+<img src="docs/images/tasks.png" width="640" alt="The Tasks panel">
 
-Spend per tool, and every quota bucket the account holds — with reset
-countdowns. Codex publishes a general allowance alongside per-model ones, so
-each is labelled: a model bucket sitting at 0% says nothing about the general
-one.
+Each session shows its state, project, branch, how full the context window is,
+and the last few turns — enough to tell whether it's on track without switching
+to it. Click a row to expand, or the arrow to jump straight to the app.
 
-Numbers come from the tools themselves. Where a reading can't refresh itself,
-it's captioned with its age rather than passed off as current.
+The hover target is the notch strip and those clusters, nothing more. Moving
+your pointer across the middle of the screen doesn't set it off.
 
-## Stats
+## Usage you can trust
 
-<img src="docs/images/stats.png" width="620" alt="The Stats panel">
+<img src="docs/images/usage.png" width="640" alt="The Usage panel">
 
-Sessions, messages, tokens, active days, streaks, peak hour and top model, over
-all time, 30 days or 7. A **Models** view breaks the same range down by model
-with stacked daily bars.
+Spend per tool, and every quota bucket your account actually holds, with reset
+countdowns. Codex hands out a general allowance *and* per-model ones, so each is
+labelled — a model bucket sitting at 0% tells you nothing about the general one,
+and conflating them is how you get caught out.
+
+The numbers come from the tools themselves rather than being estimated. Where a
+reading can't refresh itself, it says how old it is instead of pretending to be
+current.
+
+## Where the time went
+
+<img src="docs/images/stats.png" width="640" alt="The Stats panel">
+
+Sessions, messages, tokens, active days, streaks, peak hour, favourite model —
+across all time, 30 days or 7. The **Models** view splits the same range by
+model with stacked daily bars.
 
 ---
 
-## Build from source
+## Let the tools tell you
 
-Building locally sidesteps quarantine entirely:
+Reading log files only gets you so far: a file's timestamp can't tell the
+difference between a model that's thinking and one that finished thirty seconds
+ago. Both tools can simply *say* what happened — a lifecycle event fires at the
+transition and names it.
 
-```bash
-./build-app.sh release --universal
-open build/Perch.app
-```
+<img src="docs/images/settings.png" width="640" alt="Settings">
 
-Perch is an accessory app — no Dock icon. Everything lives in the menu bar item
-and the notch. To run it at login, add `build/Perch.app` under
-System Settings → General → Login Items.
-
-## Live reporting
-
-Perch can read log files, or the tools can **tell it what happened**. The second
-is better: a file's modification time can't distinguish a model that is thinking
-from one that finished thirty seconds ago, while a lifecycle event fires *at*
-the transition and says which one it was.
-
-Each tool gets its own mechanism, because the two share nothing:
+Turn it on in **Settings → Live reporting**. Each tool gets its own mechanism,
+because the two have nothing in common:
 
 | | Claude Code | Codex |
 |---|---|---|
 | Mechanism | [hooks](https://code.claude.com/docs/en/hooks) | `notify` in `config.toml` |
-| Events | SessionStart · UserPromptSubmit · Stop · Notification · SessionEnd | `agent-turn-complete` |
 | Writes to | `~/.claude/settings.json` | `~/.codex/config.toml` |
-| Coexistence | sits beside your own hooks | *chains* to whatever `notify` was already set |
+| If you already use it | Perch sits beside your own hooks | Perch *chains* to your existing program |
 
-Turn them on in **Settings → Live reporting**.
-
-<img src="docs/images/settings.png" width="620" alt="Settings">
-
-Both are opt-in and reversible: uninstalling restores `config.toml`
-byte-for-byte and removes only Perch's own hook entries.
-
-Reports land as small JSON files under
-`~/Library/Application Support/Perch/Reports/`. The filesystem is the transport
-on purpose — a hook is a short-lived process that must not block on a socket
-handshake, the reports survive Perch being closed, and nothing is lost if Perch
-starts late. Perch watches those directories, so a hook firing refreshes the
-notch immediately rather than at the next poll.
+This edits your config, so it's opt-in and it's reversible. Turning it off
+restores `config.toml` byte-for-byte and removes only Perch's own hook entries.
+Nothing you had set up gets replaced.
 
 ---
 
-## Where the numbers come from
+## Keeping the numbers honest
 
-| | Claude Code | Codex |
-|---|---|---|
-| Sessions | `~/.claude/projects/**/*.jsonl` | `~/.codex/sessions/**/rollout-*.jsonl` |
-| Task state | hooks (push) → inference | `notify` (push) → lifecycle events |
-| Tokens | per-request `usage`, deduplicated | `token_count`, already cumulative |
-| Quota | [status line](https://code.claude.com/docs/en/statusline) | `account/rateLimits/read` over the app-server protocol |
-| Context window | status line (`context_window_size`) | log (`model_context_window`) |
+Most of the work in Perch went here, because usage data is easy to display and
+surprisingly easy to get wrong. A few of the traps, all of which I fell into
+first:
 
-A handful of things this got wrong first, which the code now comments:
+**Providers disagree about cached tokens.** Codex counts cache *inside*
+`input_tokens`; Anthropic reports it alongside. Add them the same way and Codex
+inflates by roughly 2×.
 
-**Tokens are counted once.** Providers disagree about cached input: Codex
-reports `input_tokens` with cached tokens *already inside it*
-(`input + output == total`), while Anthropic reports cache reads and writes
-*alongside* `input`. Perch normalises both so cache is always a breakdown of
-input, never extra volume — getting this wrong inflated Codex by ~2×.
+**Claude Code writes one record per content block**, each repeating the whole
+response's usage. Counting records instead of responses overcounted by 1.84×.
 
-**A response is counted once, too.** Claude Code writes one `assistant` record
-per content block, each repeating the whole response's usage. Deduplicating on
-`(message.id, requestId)` cut a 1.84× overcount.
+**A 15 MB session log doesn't fit in a tail read.** Totals stream the whole
+file, cached by byte offset so a two-second poll only parses what's new.
 
-**Usage is read from the whole log, not its tail.** A 15 MB session log means a
-256 KB tail sees ~1.7% of the requests. Totals come from a streaming full-file
-pass, cached per file by byte offset so a two-second poll only parses newly
-appended bytes.
+**Hidden sessions still cost money.** Codex subagents don't get their own row —
+one request can spawn a dozen — but on a normal day they're most of the spend,
+so they still count.
 
-**Hidden sessions still cost money.** Codex subagents get no row — one request
-can spawn a dozen — but they were also being dropped from the totals, where on a
-normal day they are the overwhelming majority of spend. Rows and accounting are
-separate concerns now.
+**Quota belongs to the account, not a session.** It outlives whatever ran last,
+and a tool that's been quiet all evening still has an allowance worth showing.
 
-**Quota belongs to the account, not a session** — and outlives it. Providers
-report it separately from sessions, so a tool that hasn't run recently still
-shows its allowance.
+There are 144 tests, and the ones that matter re-derive these numbers straight
+from the raw logs and the Codex protocol — independently of Perch's own parsers
+— then assert the UI agrees. An earlier version of that check shared a bug with
+the code it was checking and cheerfully confirmed a total nearly twice reality,
+which is exactly why it works that way now.
 
-**A reading that can't refresh itself is kept, not discarded.** Codex answers
-live. Claude Code's arrives only while a session renders a status line, so once
-that session ends nothing can refresh it. Discarding it made quota vanish
-minutes later; it's kept and captioned with its age instead. Within a window
-usage only grows, so an older percentage is a floor. What *does* make a reading
-meaningless is its window passing `resets_at` — that's dropped regardless.
+## Adding your own tool
 
-**"Needs approval" is attention, not completion.** Claude Code's `Notification`
-hook also fires on `idle_prompt`, mid-turn. Subscribing to all of it made the
-completion chime announce tasks that hadn't finished.
-
----
-
-## Writing a plugin
-
-A plugin is any executable that prints a JSON array of sessions on stdout. No
-Swift required. Drop a directory into
-`~/Library/Application Support/Perch/Plugins/<your-tool>/`:
-
-```json
-{
-  "id": "my-agent",
-  "displayName": "My Agent",
-  "symbol": "sparkles",
-  "accentHex": "#4285F4",
-  "command": "probe",
-  "timeout": 5,
-  "availabilityPath": "~/.my-agent"
-}
-```
-
-Your executable prints:
+Perch ships with Claude Code and Codex. Anything else is a plugin, and a plugin
+is just an executable that prints JSON:
 
 ```json
 [{
@@ -195,62 +155,42 @@ Your executable prints:
 }]
 ```
 
-Only `nativeID`, `title` and `state` are required.
+Drop it with a small `plugin.json` into
+`~/Library/Application Support/Perch/Plugins/`. Only `nativeID`, `title` and
+`state` are required; `state` is one of `running`, `awaitingInput`,
+`awaitingApproval`, `completed`, `failed`. There's a working example in
+[`examples/gemini-plugin/`](examples/gemini-plugin/).
 
-- **`state`** — `running`, `awaitingInput`, `awaitingApproval`, `completed`, `failed`
-- **`target`** — `pid:1234`, `bundle:com.example.App`, `url:https://…`, `file:/path`
+Plugins run on every poll, so keep them quick. Perch enforces a timeout, and one
+that hangs or prints nonsense gets reported in the panel rather than taking
+everything else down with it.
 
-A working example is in [`examples/gemini-plugin/`](examples/gemini-plugin/).
-Plugins run as you, on every poll, so keep them fast — Perch enforces the
-timeout, and one that hangs, crashes or prints garbage is reported in the panel
-footer without affecting the others.
+Prefer Swift? Conform to `AgentProvider` from `PerchKit`.
 
-Prefer Swift? Conform to `AgentProvider` from the `PerchKit` library.
+## Build from source
 
-## Design notes
-
-- **Polling adapts.** Two seconds while something is running, ten when idle.
-- **Logs are tailed for display, streamed for totals.** Different jobs, different reads.
-- **The panel never steals focus.** A `.nonactivatingPanel` that can become key
-  so clicks land, but never main.
-- **Providers are isolated.** Polled concurrently; one throwing or hanging can't
-  stall the others.
-- **Colors are explicit, not semantic.** The panel is always dark, so
-  `.secondary` would resolve against the wrong background.
-- **Works without a notch.** Falls back to a centred strip in the menu bar.
-
-## Tests
+Skips the quarantine step entirely:
 
 ```bash
-swift test
+./build-app.sh release --universal
+open build/Perch.app
 ```
 
-144 tests. The ones that matter most re-derive the numbers **straight from the
-raw logs and the Codex protocol, independently of Perch's own parsers**, and
-assert the Usage tab matches — for both tools and every quota bucket. That's
-what stops displayed usage drifting from reality, rather than only checking
-Perch against itself.
+Perch is an accessory app — no Dock icon, everything lives in the menu bar item
+and the notch. To have it there every day, add it under
+System Settings → General → Login Items.
 
-The rest cover state inference, the token and context distinctions, rate-limit
-parsing, stats aggregation, completion-alert debouncing, settings persistence,
-hover trigger bounds, panel geometry, plugin behaviour including timeout and
-malformed output, and the rename migration.
+## Thanks
 
-## Prior art
+The notch geometry follows [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit),
+which works out exact bounds from `auxiliaryTopLeftArea` / `auxiliaryTopRightArea`
+instead of hardcoding sizes, and [TheBoringNotch](https://github.com/TheBoringTeam/theboringnotch)
+for the hover-to-expand feel.
 
-The notch geometry and non-activating panel follow patterns established by
-[DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) — deriving exact
-bounds from `auxiliaryTopLeftArea` / `auxiliaryTopRightArea` rather than
-hardcoding sizes — and [TheBoringNotch](https://github.com/TheBoringTeam/theboringnotch).
-
-The usage plumbing owes a lot to [ccusage](https://github.com/ccusage/ccusage)
-(5-hour block reconstruction, the response dedup key) and
-[Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor)
-(provenance labels on every figure).
-
-Those tools surface media, files and system HUDs, or live in a terminal. Perch
-surfaces agent task state on the notch, and is built around a plugin boundary so
-any tool can appear in it.
+The usage side owes a lot to [ccusage](https://github.com/ccusage/ccusage) —
+reading its source is where I found the response dedup key that fixed my 1.84×
+overcount — and to [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor)
+for the idea of labelling every figure with where it came from.
 
 ## License
 
