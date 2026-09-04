@@ -17,6 +17,21 @@ and how much of your quota is left.
 
 ---
 
+## Install
+
+[**Download Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) → unzip → drag to `/Applications`.
+
+It is not notarized, so macOS quarantines it on first launch and offers only
+"Move to Bin". Clear the flag once and it opens normally from then on:
+
+```bash
+xattr -d com.apple.quarantine /Applications/Perch.app
+```
+
+macOS 14 or later, Apple silicon and Intel.
+
+---
+
 ## What it does
 
 Two small clusters hug the physical notch, leaving the cutout itself clear. A
@@ -55,20 +70,9 @@ with stacked daily bars.
 
 ---
 
-## Install
+## Build from source
 
-Download the latest build from
-[Releases](https://github.com/ctudoudou/Perch/releases), unzip, and move
-`Perch.app` to `/Applications`.
-
-The app is ad-hoc signed rather than notarized, so macOS will refuse it on first
-launch. Clear the quarantine flag once:
-
-```bash
-xattr -d com.apple.quarantine /Applications/Perch.app
-```
-
-Or build it yourself, which sidesteps quarantine entirely:
+Building locally sidesteps quarantine entirely:
 
 ```bash
 ./build-app.sh release --universal

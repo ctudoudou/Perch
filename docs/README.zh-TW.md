@@ -16,6 +16,20 @@
 
 ---
 
+## 安裝
+
+[**下載 Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) → 解壓縮 → 拖進 `/Applications`。
+
+它沒有經過 Apple 公證，所以首次開啟時 macOS 會隔離它、而且只給你「移到垃圾桶」的選項。清一次隔離屬性，之後就能正常開啟：
+
+```bash
+xattr -d com.apple.quarantine /Applications/Perch.app
+```
+
+需要 macOS 14 以上，Apple silicon 與 Intel 皆可。
+
+---
+
 ## 它做什麼
 
 兩組小小的指示貼著實體瀏海，中間的凹口保持淨空。左邊是脈動的狀態點與進行中的數量，右邊每個工具一枚帶色徽章——閒置時淡化，有事等你時右上角亮起小黃點。
@@ -44,17 +58,9 @@ Session 數、訊息數、token、活躍天數、連續天數、尖峰時段與�
 
 ---
 
-## 安裝
+## 從原始碼建置
 
-到 [Releases](https://github.com/ctudoudou/Perch/releases) 下載，解壓縮後把 `Perch.app` 移到 `/Applications`。
-
-這個 App 只有 ad-hoc 簽名、未經 Apple 公證，所以首次開啟時 macOS 會擋下來。清一次隔離屬性即可：
-
-```bash
-xattr -d com.apple.quarantine /Applications/Perch.app
-```
-
-或者自己建置，完全不會有隔離問題：
+自己建置完全不會有隔離問題：
 
 ```bash
 ./build-app.sh release --universal
