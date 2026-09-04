@@ -1,0 +1,10 @@
+{
+  "id": "gemini-cli",
+  "displayName": "Gemini CLI",
+  "symbol": "diamond.fill",
+  "accentHex": "#4285F4",
+  "command": "probe.py",
+  "arguments": [],
+  "timeout": 5,
+  "availabilityPath": "~/.gemini"
+}
