@@ -185,18 +185,6 @@ Perch is an accessory app — no Dock icon, everything lives in the menu bar ite
 and the notch. To have it there every day, add it under
 System Settings → General → Login Items.
 
-## Thanks
-
-The notch geometry follows [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit),
-which works out exact bounds from `auxiliaryTopLeftArea` / `auxiliaryTopRightArea`
-instead of hardcoding sizes, and [TheBoringNotch](https://github.com/TheBoringTeam/theboringnotch)
-for the hover-to-expand feel.
-
-The usage side owes a lot to [ccusage](https://github.com/ccusage/ccusage) —
-reading its source is where I found the response dedup key that fixed my 1.84×
-overcount — and to [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor)
-for the idea of labelling every figure with where it came from.
-
 ## License
 
 MIT

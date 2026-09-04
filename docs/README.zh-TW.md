@@ -137,12 +137,6 @@ open build/Perch.app
 
 Perch 是輔助型應用（accessory app）——沒有 Dock 圖示，一切都在選單列項目與瀏海上。想讓它每天都在，到「系統設定 → 一般 → 登入項目」加入它。
 
-## 致謝
-
-瀏海幾何參考 [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit)——它用 `auxiliaryTopLeftArea` / `auxiliaryTopRightArea` 反推精確邊界，而不是寫死尺寸——以及 [TheBoringNotch](https://github.com/TheBoringTeam/theboringnotch) 的懸停展開手感。
-
-用量這部分受惠於 [ccusage](https://github.com/ccusage/ccusage)——我是讀它的原始碼才找到那個回應去重鍵，修掉了自己 1.84 倍的超計——以及 [Claude-Code-Usage-Monitor](https://github.com/Maciek-roboblog/Claude-Code-Usage-Monitor) 為每個數字標註來源的做法。
-
 ## 授權
 
 MIT
