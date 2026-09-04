@@ -4,6 +4,5 @@ build/
 *.xcodeproj
 .swiftpm/
 
-# Icon generator — kept locally, not part of the repo.
-# The built Perch.icns is committed; regenerate it with tools/make-icon.sh.
+# Local tooling; the built Perch.icns is committed.
 tools/
