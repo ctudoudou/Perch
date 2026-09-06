@@ -123,6 +123,103 @@ struct CodexProvider: AgentProvider {
         return SessionStore.mergeLimits(scraped)
     }
 
+    /// History, gathered without reading whole files.
+    ///
+    /// Codex rollouts reach hundreds of megabytes each, so this takes only two
+    /// small reads per file: the head, where `session_meta` puts `cwd` and
+    /// `thread_source` before the multi-hundred-kilobyte instruction blob, and
+    /// the tail, where the newest `token_count` already holds the session's
+    /// cumulative total.
+    func fetchHistory(since: Date) async throws -> [SessionSummary] {
+        recentLogs(since: since).compactMap { summarise(log: $0.url, modified: $0.modified) }
+    }
+
+    private func summarise(log url: URL, modified: Date) -> SessionSummary? {
+        if let cached = Self.cache.value(for: url, modified: modified) { return cached.summary }
+
+        // One head read covers all the metadata. 256 KB because that is where
+        // the first `turn_context` lives on all but a few sessions — measured
+        // across this machine's rollouts, a 256 KB head resolves the model for
+        // 24 of 25, while even a 4 MB *tail* resolves only 23.
+        let head = JSONLReader.headBytes(of: url, count: 256 * 1024)
+        let isSubagent = head.contains(#""thread_source":"subagent""#)
+        let project = Self.extract(#""cwd":""#, from: head)
+        let model = Self.modelFromTurnContext(in: head)
+
+        var usage = TokenUsage()
+        for record in JSONLReader.tailObjects(of: url, maxBytes: 128 * 1024) {
+            guard let payload = record.dict("payload") else { continue }
+            guard payload.string("type") == "token_count",
+                  let total = payload.dict("info")?.dict("total_token_usage")
+            else { continue }
+            // Cumulative for the whole session: assign, never accumulate.
+            usage.input = total.int("input_tokens") ?? usage.input
+            usage.output = total.int("output_tokens") ?? usage.output
+            usage.cacheRead = total.int("cached_input_tokens") ?? usage.cacheRead
+            usage.reasoning = total.int("reasoning_output_tokens") ?? usage.reasoning
+        }
+
+        // Internal machinery is not the user's work.
+        let isInternal = model.map(Self.internalModels.contains) ?? false
+        let summary = isInternal ? nil : SessionSummary(
+            providerID: id,
+            nativeID: url.deletingPathExtension().lastPathComponent,
+            updatedAt: modified,
+            model: model,
+            usage: usage,
+            projectPath: project,
+            isSubagent: isSubagent
+        )
+        Self.cache.store(summary, for: url, modified: modified)
+        return summary
+    }
+
+    /// The model named by the session's first `turn_context`.
+    ///
+    /// Searched after that marker so `model_provider` in the preceding
+    /// `session_meta` cannot be mistaken for it.
+    static func modelFromTurnContext(in text: String) -> String? {
+        guard let marker = text.range(of: #""turn_context""#) else { return nil }
+        return extract(#""model":""#, from: String(text[marker.upperBound...]))
+    }
+
+    /// Remembers each log's summary so an unchanged file is read once.
+    ///
+    /// History is rescanned on a timer over hundreds of files; without this,
+    /// every scan would re-read the same unchanged megabytes.
+    final class SummaryCache: @unchecked Sendable {
+        private struct Entry {
+            var modified: Date
+            var summary: SessionSummary?
+        }
+
+        private var entries: [URL: Entry] = [:]
+        private let lock = NSLock()
+
+        func value(for url: URL, modified: Date) -> (summary: SessionSummary?, Void)? {
+            lock.lock(); defer { lock.unlock() }
+            guard let entry = entries[url], entry.modified == modified else { return nil }
+            return (entry.summary, ())
+        }
+
+        func store(_ summary: SessionSummary?, for url: URL, modified: Date) {
+            lock.lock(); defer { lock.unlock() }
+            entries[url] = Entry(modified: modified, summary: summary)
+        }
+    }
+
+    static let cache = SummaryCache()
+
+    /// Pull a simple `"key":"value"` out of raw text, avoiding a JSON parse of
+    /// a record that may be hundreds of kilobytes.
+    static func extract(_ key: String, from text: String) -> String? {
+        guard let start = text.range(of: key) else { return nil }
+        let rest = text[start.upperBound...]
+        guard let end = rest.firstIndex(of: "\"") else { return nil }
+        let value = String(rest[rest.startIndex ..< end])
+        return value.isEmpty ? nil : value
+    }
+
     static let reportTool = CodexReporter.tool
 
     private func parse(

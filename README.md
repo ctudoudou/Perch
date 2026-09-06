@@ -85,9 +85,14 @@ current.
 
 <img src="docs/images/stats.png" width="640" alt="The Stats panel">
 
-Sessions, messages, tokens, active days, streaks, peak hour, favourite model —
-across all time, 30 days or 7. The **Models** view splits the same range by
-model with stacked daily bars.
+Sessions, projects, tokens, active days, streaks, peak hour, favourite model —
+across all time, 30 days or 7. This reads your whole log history, not just
+what's on screen: on my machine that's eleven months and 56 active days.
+
+<img src="docs/images/models.png" width="640" alt="The Models view">
+
+The **Models** view splits the same range by model, with stacked daily bars and
+each model's share of the total.
 
 ---
 

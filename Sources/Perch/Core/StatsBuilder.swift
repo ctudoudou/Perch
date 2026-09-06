@@ -38,7 +38,13 @@ struct DayStat: Identifiable, Sendable {
 /// Headline numbers shown as tiles.
 struct StatsSummary: Sendable {
     var sessions = 0
-    var messages = 0
+    /// Distinct working directories touched in the range.
+    ///
+    /// Replaces a message count, which cannot be gathered honestly: Codex
+    /// rollouts run to hundreds of megabytes, so counting their records means
+    /// reading gigabytes, and a tile that silently covered only one of the two
+    /// tools would be worse than no tile.
+    var projects = 0
     var totalTokens = 0
     var activeDays = 0
     var currentStreak = 0
@@ -70,20 +76,22 @@ enum StatsBuilder {
         }
     }
 
-    static func filter(_ sessions: [AgentSession], range: Range, now: Date = Date()) -> [AgentSession] {
+    static func filter(_ sessions: [SessionSummary], range: Range, now: Date = Date()) -> [SessionSummary] {
         guard let days = range.days else { return sessions }
         let cutoff = Calendar.current.date(byAdding: .day, value: -days, to: now) ?? now
         return sessions.filter { $0.updatedAt >= cutoff }
     }
 
     static func summary(
-        _ sessions: [AgentSession],
+        _ sessions: [SessionSummary],
         calendar: Calendar = .current,
         now: Date = Date()
     ) -> StatsSummary {
         var stats = StatsSummary()
-        stats.sessions = sessions.count
-        stats.messages = sessions.reduce(0) { $0 + $1.transcript.count }
+        // Machine-spawned sessions are real spend but not something the user
+        // opened, so they count for tokens and not for the session tally.
+        stats.sessions = sessions.count(where: { !$0.isSubagent })
+        stats.projects = Set(sessions.compactMap(\.projectPath)).count
         stats.totalTokens = sessions.reduce(0) { $0 + $1.usage.total }
 
         let days = Set(sessions.map { calendar.startOfDay(for: $0.updatedAt) })
@@ -139,7 +147,7 @@ enum StatsBuilder {
         return (current, longest)
     }
 
-    static func models(_ sessions: [AgentSession]) -> [ModelStat] {
+    static func models(_ sessions: [SessionSummary]) -> [ModelStat] {
         var byModel: [String: ModelStat] = [:]
         for session in sessions {
             let key = session.model ?? "unknown"
@@ -155,7 +163,7 @@ enum StatsBuilder {
     }
 
     static func days(
-        _ sessions: [AgentSession],
+        _ sessions: [SessionSummary],
         calendar: Calendar = .current
     ) -> [DayStat] {
         var byDay: [Date: DayStat] = [:]
@@ -172,7 +180,7 @@ enum StatsBuilder {
 
     /// A fixed-length grid of daily totals ending today, for the heatmap.
     static func heatmap(
-        _ sessions: [AgentSession],
+        _ sessions: [SessionSummary],
         weeks: Int = 20,
         calendar: Calendar = .current,
         now: Date = Date()

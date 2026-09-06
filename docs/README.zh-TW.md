@@ -67,7 +67,11 @@ xattr -cr /Applications/Perch.app
 
 <img src="images/stats.png" width="640" alt="統計面板">
 
-Session 數、訊息數、token、活躍天數、連續天數、尖峰時段、最常用的模型——可切換全部／30 天／7 天。**Models** 分頁用堆疊柱狀圖把同一區間依模型拆開。
+Session 數、專案數、token、活躍天數、連續天數、尖峰時段、最常用的模型——可切換全部／30 天／7 天。這裡讀的是你完整的日誌歷史，不只是畫面上那些：在我的機器上是十一個月、56 個活躍日。
+
+<img src="images/models.png" width="640" alt="Models 分頁">
+
+**Models** 分頁用堆疊柱狀圖把同一區間依模型拆開，並列出各模型佔的比例。
 
 ---
 

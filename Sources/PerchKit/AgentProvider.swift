@@ -32,6 +32,14 @@ public protocol AgentProvider: Sendable {
     /// Throwing marks the provider as errored for that cycle without affecting others.
     func fetchSessions() async throws -> [AgentSession]
 
+    /// Sessions going back to `since`, reduced to what statistics need.
+    ///
+    /// Separate from `fetchSessions` because the two have opposite constraints:
+    /// the task list wants full detail over a few hours, history wants months
+    /// of coverage cheaply. A provider that cannot answer cheaply should return
+    /// what it can rather than reading gigabytes.
+    func fetchHistory(since: Date) async throws -> [SessionSummary]
+
     /// Quota windows for the account this tool is signed into.
     ///
     /// Deliberately separate from sessions: an allowance belongs to the account
@@ -46,4 +54,9 @@ public extension AgentProvider {
     func isAvailable() -> Bool { true }
     /// Most tools publish no quota at all.
     func accountQuota() async -> [RateLimitWindow] { [] }
+
+    /// By default a provider has no history beyond what it is already showing.
+    func fetchHistory(since: Date) async throws -> [SessionSummary] {
+        try await fetchSessions().map(\.summary)
+    }
 }

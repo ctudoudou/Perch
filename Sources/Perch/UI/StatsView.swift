@@ -15,8 +15,10 @@ struct StatsView: View {
     @State private var mode: Mode = .overview
     @State private var range: StatsBuilder.Range = .all
 
-    private var sessions: [AgentSession] {
-        StatsBuilder.filter(store.visibleSessions, range: range)
+    /// Statistics come from the long-range history, not the task list. The
+    /// task list is capped to a few hours, which made every range show today.
+    private var sessions: [SessionSummary] {
+        StatsBuilder.filter(store.history, range: range)
     }
 
     var body: some View {
@@ -76,7 +78,7 @@ struct StatsView: View {
                 spacing: 6
             ) {
                 StatTile(label: "Sessions", value: "\(summary.sessions)")
-                StatTile(label: "Messages", value: "\(summary.messages)")
+                StatTile(label: "Projects", value: "\(summary.projects)")
                 StatTile(label: "Total tokens", value: Format.tokens(summary.totalTokens))
                 StatTile(label: "Active days", value: "\(summary.activeDays)")
                 StatTile(label: "Current streak", value: "\(summary.currentStreak)d")
@@ -85,11 +87,6 @@ struct StatsView: View {
                 StatTile(label: "Top model", value: summary.favoriteModel ?? "—")
             }
             Heatmap(grid: StatsBuilder.heatmap(sessions))
-            if summary.totalTokens > 0 {
-                Text(Format.comparison(summary.totalTokens))
-                    .font(.system(size: 9))
-                    .foregroundStyle(Palette.label)
-            }
         }
     }
 }
@@ -124,17 +121,27 @@ struct StatTile: View {
 struct Heatmap: View {
     let grid: [[Int]]
 
-    private var peak: Int {
-        grid.flatMap { $0 }.max() ?? 0
+    /// Thresholds splitting the active days into five bands.
+    ///
+    /// Shading by value-over-peak — even on a log scale — collapses to one
+    /// colour on real data: a year of use spans several orders of magnitude, so
+    /// almost every day lands in the same band as the busiest. Ranking the days
+    /// against each other keeps all five bands populated, which is the point of
+    /// a heatmap.
+    private var thresholds: [Int] {
+        let active = grid.flatMap { $0 }.filter { $0 > 0 }.sorted()
+        guard !active.isEmpty else { return [] }
+        return (1 ... 4).map { active[min(active.count - 1, active.count * $0 / 5)] }
     }
 
     var body: some View {
-        VStack(spacing: 2) {
+        let bands = thresholds
+        return VStack(spacing: 2) {
             ForEach(Array(grid.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 2) {
                     ForEach(Array(row.enumerated()), id: \.offset) { _, value in
                         RoundedRectangle(cornerRadius: 2)
-                            .fill(colour(for: value))
+                            .fill(colour(for: value, bands: bands))
                             .frame(height: 9)
                     }
                 }
@@ -142,17 +149,16 @@ struct Heatmap: View {
         }
     }
 
-    /// Log-scaled, so a single huge day does not wash out every other one.
-    private func colour(for value: Int) -> Color {
-        guard value > 0, peak > 0 else { return .white.opacity(0.06) }
-        let level = log1p(Double(value)) / log1p(Double(peak))
-        return Color.accentColor.opacity(0.25 + 0.75 * level)
+    private func colour(for value: Int, bands: [Int]) -> Color {
+        guard value > 0 else { return .white.opacity(0.06) }
+        let level = bands.filter { value > $0 }.count
+        return Color.accentColor.opacity(0.3 + 0.175 * Double(level))
     }
 }
 
 /// Stacked daily bars plus a per-model legend with shares.
 struct ModelChart: View {
-    let sessions: [AgentSession]
+    let sessions: [SessionSummary]
 
     private var models: [ModelStat] { StatsBuilder.models(sessions) }
     private var days: [DayStat] { Array(StatsBuilder.days(sessions).suffix(14)) }

@@ -15,6 +15,23 @@ final class SessionStore {
     private(set) var providerErrors: [String: String] = [:]
     /// Account-level quota per provider, refreshed alongside sessions.
     private(set) var accountQuota: [String: [RateLimitWindow]] = [:]
+
+    /// Long-range history for the Stats tab.
+    ///
+    /// Kept apart from `sessions`, which is bounded to a few hours for the task
+    /// list. Statistics were previously built from that same list, so "All
+    /// time" only ever meant "the last eight hours" — on this machine that hid
+    /// 88 days of Codex history behind a single day.
+    private(set) var history: [SessionSummary] = []
+
+    /// How far back statistics reach.
+    static let historyWindow: TimeInterval = 365 * 24 * 3600
+    /// History changes slowly and costs real disk reads, so it is refreshed on
+    /// its own schedule rather than on every two-second poll.
+    static let historyInterval: TimeInterval = 5 * 60
+
+    private var lastHistoryRefresh: Date?
+    private var historyTask: Task<Void, Never>?
     private(set) var lastRefresh: Date?
 
     /// What the task list and wall show: real user-started sessions.
@@ -164,12 +181,43 @@ final class SessionStore {
             }
         }
         accountQuota = quota
+        refreshHistoryIfDue()
 
         let sorted = merged.sorted(by: Self.displayOrder)
         notifier.process(sorted.filter { !$0.isSubagent })
         sessions = sorted
         providerErrors = errors
         lastRefresh = Date()
+    }
+
+    /// Kick off a history scan when one is due, without making the caller wait.
+    private func refreshHistoryIfDue() {
+        guard historyTask == nil else { return }
+        if let last = lastHistoryRefresh,
+           Date().timeIntervalSince(last) < Self.historyInterval { return }
+
+        let snapshot = providers
+        let since = Date().addingTimeInterval(-Self.historyWindow)
+        historyTask = Task { [weak self] in
+            var gathered: [SessionSummary] = []
+            for provider in snapshot {
+                guard let summaries = try? await provider.fetchHistory(since: since) else { continue }
+                gathered.append(contentsOf: summaries)
+            }
+            await MainActor.run {
+                guard let self else { return }
+                self.history = gathered.sorted { $0.updatedAt < $1.updatedAt }
+                self.lastHistoryRefresh = Date()
+                self.historyTask = nil
+            }
+        }
+    }
+
+    /// Force a history scan and wait for it. For tests and first paint.
+    func warmHistory() async {
+        lastHistoryRefresh = nil
+        refreshHistoryIfDue()
+        await historyTask?.value
     }
 
     /// Per-provider rollups for the Usage tab.

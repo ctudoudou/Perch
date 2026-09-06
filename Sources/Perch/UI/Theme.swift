@@ -97,15 +97,6 @@ extension Format {
         return formatter
     }()
 
-    /// A human yardstick for an otherwise abstract token count.
-    static func comparison(_ tokens: Int) -> String {
-        // ~170k tokens for the novel, a familiar unit of "a lot of text".
-        let novels = Double(tokens) / 170_000
-        if novels >= 1 {
-            return String(format: "About %.0f× the text of a novel.", novels)
-        }
-        return String(format: "About %.0f%% of a novel's text.", novels * 100)
-    }
 }
 
 extension Format {

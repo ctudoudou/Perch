@@ -15,30 +15,49 @@ struct StatsTests {
         model: String? = "claude-opus-5",
         tokens: Int = 1_000,
         daysAgo: Int = 0,
-        messages: Int = 2,
+        project: String? = "/proj",
+        isSubagent: Bool = false,
         now: Date = Date()
-    ) -> AgentSession {
+    ) -> SessionSummary {
         let day = calendar.date(byAdding: .day, value: -daysAgo, to: now)!
-        return AgentSession(
-            providerID: "p", nativeID: UUID().uuidString, title: "t",
-            model: model, state: .completed,
+        return SessionSummary(
+            providerID: "p", nativeID: UUID().uuidString,
+            updatedAt: day, model: model,
             usage: TokenUsage(input: tokens / 2, output: tokens / 2),
-            transcript: (0 ..< messages).map {
-                .init(role: .user, text: "m\($0)", timestamp: day)
-            },
-            startedAt: day, updatedAt: day
+            projectPath: project, isSubagent: isSubagent
         )
     }
 
-    @Test("summary totals sessions, messages and tokens")
+    @Test("summary totals sessions, projects and tokens")
     func summaryTotals() {
         let stats = StatsBuilder.summary(
-            [session(tokens: 1_000, messages: 3), session(tokens: 500, messages: 2)],
+            [session(tokens: 1_000, project: "/a"), session(tokens: 500, project: "/b")],
             calendar: calendar
         )
         #expect(stats.sessions == 2)
-        #expect(stats.messages == 5)
+        #expect(stats.projects == 2)
         #expect(stats.totalTokens == 1_500)
+    }
+
+    @Test("repeat visits to one project count once")
+    func projectsAreDistinct() {
+        let stats = StatsBuilder.summary(
+            [session(project: "/a"), session(project: "/a"), session(project: "/b")],
+            calendar: calendar
+        )
+        #expect(stats.projects == 2)
+        #expect(stats.sessions == 3)
+    }
+
+    @Test("subagent spend counts, subagent sessions do not")
+    func subagentsCountForTokensOnly() {
+        let stats = StatsBuilder.summary(
+            [session(tokens: 100), session(tokens: 900, isSubagent: true)],
+            calendar: calendar
+        )
+        // One session the user opened; both sessions' tokens.
+        #expect(stats.sessions == 1)
+        #expect(stats.totalTokens == 1_000)
     }
 
     @Test("consecutive days form a streak")
@@ -150,5 +169,75 @@ struct StatsTests {
         // Two small sessions at 10 AM must not outrank one huge one at 10 PM.
         let stats = StatsBuilder.summary([big, small1, small2], calendar: calendar, now: now)
         #expect(stats.peakHour == 22)
+    }
+}
+
+/// Statistics used to be built from the task list, which providers cap at a few
+/// hours. Every range therefore showed the same single day — on this machine
+/// that hid 88 days of Codex history.
+@Suite("History reaches back")
+@MainActor
+struct HistoryRangeTests {
+    private func store() -> SessionStore {
+        SessionStore(settings: Settings(defaults: UserDefaults(suiteName: UUID().uuidString)!))
+    }
+
+    @Test("history covers far more than the visible window")
+    func historyExceedsVisibleWindow() async {
+        let store = store()
+        await store.refresh()
+        await store.warmHistory()
+        guard !store.history.isEmpty else { return }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        let historyDays = Set(store.history.map { calendar.startOfDay(for: $0.updatedAt) })
+        let visibleDays = Set(store.allSessions.map { calendar.startOfDay(for: $0.updatedAt) })
+
+        // The whole point: the task list is hours, history is months.
+        #expect(historyDays.count >= visibleDays.count)
+        let span = Date().timeIntervalSince(store.history.map(\.updatedAt).min() ?? Date())
+        #expect(span > 24 * 3600, "history spans only \(span / 3600)h")
+    }
+
+    @Test("the ranges actually differ")
+    func rangesNarrow() async {
+        let store = store()
+        await store.warmHistory()
+        guard store.history.count > 5 else { return }
+
+        let all = StatsBuilder.filter(store.history, range: .all).count
+        let month = StatsBuilder.filter(store.history, range: .month).count
+        let week = StatsBuilder.filter(store.history, range: .week).count
+
+        // Previously all three were identical, because all three were "today".
+        #expect(all >= month)
+        #expect(month >= week)
+        #expect(all > week)
+    }
+
+    @Test("models are attributed rather than lumped into unknown")
+    func modelsAreNamed() async {
+        let store = store()
+        await store.warmHistory()
+        guard !store.history.isEmpty else { return }
+
+        let named = store.history.count(where: { $0.model != nil })
+        let ratio = Double(named) / Double(store.history.count)
+        // Reading the model from a 128 KB tail left ~79% of tokens unattributed;
+        // the first `turn_context` lives near the head instead.
+        #expect(ratio > 0.7, "only \(Int(ratio * 100))% of sessions have a model")
+    }
+
+    @Test("rescanning unchanged logs is cheap")
+    func rescanIsCached() async {
+        let store = store()
+        await store.warmHistory()
+
+        let clock = ContinuousClock()
+        let again = await clock.measure { await store.warmHistory() }
+        // Codex history is over two gigabytes across hundreds of files; without
+        // a per-file cache every timer tick would re-read all of it.
+        #expect(again < .seconds(1), "warm rescan took \(again)")
     }
 }

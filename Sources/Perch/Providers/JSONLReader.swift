@@ -206,3 +206,14 @@ extension JSONLReader {
         return consumed
     }
 }
+
+extension JSONLReader {
+    /// The first `count` bytes as text, for cheap substring checks on a record
+    /// far too large to parse.
+    static func headBytes(of url: URL, count: Int) -> String {
+        guard let handle = try? FileHandle(forReadingFrom: url) else { return "" }
+        defer { try? handle.close() }
+        let data = (try? handle.read(upToCount: count)) ?? Data()
+        return String(decoding: data, as: UTF8.self)
+    }
+}

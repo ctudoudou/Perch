@@ -128,6 +128,57 @@ struct ClaudeCodeProvider: AgentProvider {
         statusline.newestWindows()
     }
 
+    /// History over a long range.
+    ///
+    /// Claude Code's logs are far smaller than Codex's, and the ledger already
+    /// caches each file's totals by byte offset, so a full pass costs nothing
+    /// after the first.
+    func fetchHistory(since: Date) async throws -> [SessionSummary] {
+        recentLogs(since: since).compactMap { summarise(log: $0.url, modified: $0.modified) }
+    }
+
+    private func summarise(log url: URL, modified: Date) -> SessionSummary? {
+        let usage = ledger.update(url) { record in
+            guard record.string("type") == "assistant",
+                  let id = record.dict("message")?.string("id") else { return nil }
+            return "\(id)|\(record.string("requestId") ?? "")"
+        } accumulate: { total, record in
+            guard record.string("type") == "assistant",
+                  let u = record.dict("message")?.dict("usage") else { return }
+            let fresh = u.int("input_tokens") ?? 0
+            let cacheRead = u.int("cache_read_input_tokens") ?? 0
+            let cacheWrite = u.int("cache_creation_input_tokens") ?? 0
+            total.input += fresh + cacheRead + cacheWrite
+            total.output += u.int("output_tokens") ?? 0
+            total.cacheRead += cacheRead
+            total.cacheWrite += cacheWrite
+            total.reasoning += u.dict("output_tokens_details")?.int("thinking_tokens") ?? 0
+        }
+
+        // A session that never got a reply is not work the user did.
+        guard usage.total > 0 else { return nil }
+
+        var model: String?
+        var project: String?
+        for record in JSONLReader.tailObjects(of: url) {
+            if let cwd = record.string("cwd") { project = cwd }
+            if record.string("type") == "assistant",
+               let value = record.dict("message")?.string("model") {
+                model = value
+            }
+        }
+        if model == Self.syntheticModel { return nil }
+
+        return SessionSummary(
+            providerID: id,
+            nativeID: url.deletingPathExtension().lastPathComponent,
+            updatedAt: modified,
+            model: model,
+            usage: usage,
+            projectPath: project
+        )
+    }
+
     static let reportTool = ClaudeCodeReporter.tool
 
     private func parse(
