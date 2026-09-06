@@ -135,7 +135,9 @@ struct CodexProvider: AgentProvider {
     }
 
     private func summarise(log url: URL, modified: Date) -> SessionSummary? {
-        if let cached = Self.cache.value(for: url, modified: modified) { return cached.summary }
+        if case let .hit(cached) = Self.cache.value(for: url, modified: modified) {
+            return cached
+        }
 
         // One head read covers all the metadata. 256 KB because that is where
         // the first `turn_context` lives on all but a few sessions — measured
@@ -159,9 +161,12 @@ struct CodexProvider: AgentProvider {
             usage.reasoning = total.int("reasoning_output_tokens") ?? usage.reasoning
         }
 
-        // Internal machinery is not the user's work.
+        // Internal machinery is not the user's work, and a session with no
+        // recorded tokens tells us nothing — it contributes zero to every
+        // total while still claiming a day in the charts, drawing an empty
+        // column that reads as missing data.
         let isInternal = model.map(Self.internalModels.contains) ?? false
-        let summary = isInternal ? nil : SessionSummary(
+        let summary = (isInternal || usage.total == 0) ? nil : SessionSummary(
             providerID: id,
             nativeID: url.deletingPathExtension().lastPathComponent,
             updatedAt: modified,
@@ -196,10 +201,17 @@ struct CodexProvider: AgentProvider {
         private var entries: [URL: Entry] = [:]
         private let lock = NSLock()
 
-        func value(for url: URL, modified: Date) -> (summary: SessionSummary?, Void)? {
+        /// A miss and a remembered "nothing to report" are different answers,
+        /// so they get different cases rather than a nested optional.
+        enum Lookup {
+            case miss
+            case hit(SessionSummary?)
+        }
+
+        func value(for url: URL, modified: Date) -> Lookup {
             lock.lock(); defer { lock.unlock() }
-            guard let entry = entries[url], entry.modified == modified else { return nil }
-            return (entry.summary, ())
+            guard let entry = entries[url], entry.modified == modified else { return .miss }
+            return .hit(entry.summary)
         }
 
         func store(_ summary: SessionSummary?, for url: URL, modified: Date) {

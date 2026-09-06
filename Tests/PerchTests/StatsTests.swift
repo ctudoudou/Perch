@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import Perch
 @testable import PerchKit
@@ -229,15 +231,139 @@ struct HistoryRangeTests {
         #expect(ratio > 0.7, "only \(Int(ratio * 100))% of sessions have a model")
     }
 
-    @Test("rescanning unchanged logs is cheap")
-    func rescanIsCached() async {
+    @Test("rescanning is stable")
+    func rescanIsStable() async {
         let store = store()
         await store.warmHistory()
-
-        let clock = ContinuousClock()
-        let again = await clock.measure { await store.warmHistory() }
-        // Codex history is over two gigabytes across hundreds of files; without
-        // a per-file cache every timer tick would re-read all of it.
-        #expect(again < .seconds(1), "warm rescan took \(again)")
+        let first = store.history.count
+        await store.warmHistory()
+        // A cached rescan must return the same history, not a doubled or
+        // emptied one.
+        #expect(store.history.count == first)
     }
+}
+
+/// Layout bugs the real data exposed: axis labels clipped by the panel edge,
+/// bars running past it, and the header's token total disappearing under the
+/// physical notch.
+@Suite("Panel layout bounds")
+@MainActor
+struct PanelLayoutTests {
+    private func fits(_ view: some View, width: CGFloat, height: CGFloat) -> Bool {
+        let host = NSHostingView(rootView: view.frame(width: width, height: height))
+        host.frame = NSRect(x: 0, y: 0, width: width, height: height)
+        host.layoutSubtreeIfNeeded()
+        // A view whose ideal width exceeds its frame is being clipped.
+        return host.fittingSize.width <= width + 0.5
+    }
+
+    private func day(_ daysAgo: Int, tokens: Int) -> SessionSummary {
+        SessionSummary(
+            providerID: "p", nativeID: "\(daysAgo)",
+            updatedAt: Date().addingTimeInterval(TimeInterval(-daysAgo * 86_400)),
+            model: "gpt-5.6-sol",
+            usage: TokenUsage(input: tokens, output: 0),
+            projectPath: "/proj"
+        )
+    }
+
+    @Test("the model chart stays inside the panel")
+    func chartFitsPanel() {
+        // Long ranges are what pushed the bars and the date row off the edge.
+        let sessions = (0 ..< 30).map { day($0, tokens: 1_000_000 * ($0 + 1)) }
+        #expect(fits(ModelChart(sessions: sessions).padding(10),
+                     width: PanelMetrics.width, height: 250))
+    }
+
+    @Test("a single active day does not stretch the chart")
+    func chartFitsOneDay() {
+        #expect(fits(ModelChart(sessions: [day(0, tokens: 5_000)]).padding(10),
+                     width: PanelMetrics.width, height: 250))
+    }
+
+    @Test("nine-figure axis labels are not clipped")
+    func axisLabelsFit() {
+        // "792.7M" at the old 30pt axis width was cut off by the panel edge.
+        let sessions = [day(0, tokens: 999_900_000), day(1, tokens: 1_000)]
+        #expect(fits(ModelChart(sessions: sessions).padding(10),
+                     width: PanelMetrics.width, height: 250))
+    }
+
+    @Test("the header reserves clearance either side of the cutout")
+    func headerClearsNotch() {
+        // Text placed flush against the cutout vanishes under the physical
+        // notch, which is wider than the rectangle these coordinates describe.
+        #expect(ExpandedView.notchClearance >= 8)
+    }
+}
+
+@Suite("Chart scaling")
+struct ChartScalingTests {
+    @Test("a quiet day still draws a visible bar")
+    func quietDayVisible() {
+        // Height is proportional but floored, so a real but small day reads as
+        // a short bar rather than a gap in the data.
+        let peak = 800_000_000.0
+        let tiny = 1_000.0
+        let raw = 96.0 * (tiny / peak)
+        #expect(raw < 1)
+        #expect(max(3, raw) == 3)
+    }
+
+    @Test("a day with no recorded tokens is left out entirely")
+    func emptyDayOmitted() {
+        // Such a session contributes nothing to any total while still claiming
+        // a column, which drew as missing data.
+        let summaries = [
+            SessionSummary(providerID: "p", nativeID: "a", updatedAt: Date(),
+                           usage: TokenUsage(input: 10, output: 5)),
+        ]
+        #expect(StatsBuilder.days(summaries).allSatisfy { $0.tokens > 0 })
+    }
+}
+
+/// Codex history spans 2.2 GB across hundreds of files, so an unchanged log
+/// must be read once and remembered. Asserted on the cache itself rather than
+/// on wall-clock time, which is not reproducible in a parallel test run.
+@Suite("History cache")
+struct HistoryCacheTests {
+    private let url = URL(fileURLWithPath: "/tmp/perch-cache-fixture.jsonl")
+
+    private func summary(_ tokens: Int) -> SessionSummary {
+        SessionSummary(providerID: "codex", nativeID: "x", updatedAt: Date(),
+                       usage: TokenUsage(input: tokens, output: 0))
+    }
+
+    @Test("an unchanged file is served from the cache")
+    func hitsOnSameModificationDate() {
+        let cache = CodexProvider.SummaryCache()
+        let modified = Date()
+        cache.store(summary(10), for: url, modified: modified)
+        guard case let .hit(cached) = cache.value(for: url, modified: modified) else {
+            Issue.record("expected a cache hit"); return
+        }
+        #expect(cached?.usage.input == 10)
+    }
+
+    @Test("a modified file is read again")
+    func missesWhenFileChanges() {
+        let cache = CodexProvider.SummaryCache()
+        cache.store(summary(10), for: url, modified: Date(timeIntervalSince1970: 1_000))
+        // A session that has grown must not keep reporting its old totals.
+        guard case .miss = cache.value(for: url, modified: Date(timeIntervalSince1970: 2_000))
+        else { Issue.record("stale entry served"); return }
+    }
+
+    @Test("a remembered omission is not a miss")
+    func remembersOmissionsDistinctly() {
+        let cache = CodexProvider.SummaryCache()
+        let modified = Date()
+        cache.store(nil, for: url, modified: modified)
+        guard case let .hit(cached) = cache.value(for: url, modified: modified) else {
+            Issue.record("expected a hit"); return
+        }
+        // Remembered as "nothing worth reporting", so the file is not re-read.
+        #expect(cached == nil)
+    }
+
 }

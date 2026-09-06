@@ -143,7 +143,7 @@ so they still count.
 **Quota belongs to the account, not a session.** It outlives whatever ran last,
 and a tool that's been quiet all evening still has an allowance worth showing.
 
-There are 144 tests, and the ones that matter re-derive these numbers straight
+There are 159 tests, and the ones that matter re-derive these numbers straight
 from the raw logs and the Codex protocol — independently of Perch's own parsers
 — then assert the UI agrees. An earlier version of that check shared a bug with
 the code it was checking and cheerfully confirmed a total nearly twice reality,

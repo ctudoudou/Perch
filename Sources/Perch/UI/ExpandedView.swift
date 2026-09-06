@@ -130,7 +130,10 @@ struct ExpandedView: View {
             }
             .frame(maxWidth: .infinity)
 
-            Color.clear.frame(width: notchWidth)
+            // The cutout, plus clearance either side. Text placed flush against
+            // the edge disappears under the physical notch, which is slightly
+            // wider than the rectangle these coordinates describe.
+            Color.clear.frame(width: notchWidth + Self.notchClearance * 2)
 
             HStack(spacing: 5) {
                 Text(totalTokens)
@@ -149,6 +152,9 @@ struct ExpandedView: View {
         .frame(height: notchHeight)
         .padding(.horizontal, 10)
     }
+
+    /// Gap kept between the cutout and anything drawn beside it.
+    static let notchClearance: CGFloat = 12
 
     private var totalTokens: String {
         Format.tokens(store.visibleSessions.reduce(0) { $0 + $1.usage.total })

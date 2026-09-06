@@ -190,42 +190,90 @@ struct ModelChart: View {
 
     private var peak: Int { days.map(\.tokens).max() ?? 1 }
 
-    private var chart: some View {
-        HStack(alignment: .bottom, spacing: 5) {
-            // Axis labels, so the bars carry a scale rather than being decorative.
-            VStack(alignment: .trailing, spacing: 0) {
-                Text(Format.tokens(peak))
-                Spacer()
-                Text(Format.tokens(peak / 2))
-                Spacer()
-                Text("0")
-            }
-            .font(.system(size: 7.5, design: .rounded))
-            .foregroundStyle(Palette.label)
-            .frame(width: 30, height: 96)
+    /// Height of the plot area.
+    private static let plotHeight: CGFloat = 96
+    /// Width of the value axis. Sized for the widest label it can hold
+    /// ("999.9M"); at 30pt the labels were clipped by the panel edge.
+    private static let axisWidth: CGFloat = 46
 
-            HStack(alignment: .bottom, spacing: 4) {
+    private var chart: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            // Say what is being plotted. Without this the axes are two columns
+            // of numbers with no stated meaning.
+            Text("Tokens per active day")
+                .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(Palette.label)
+
+            HStack(alignment: .bottom, spacing: 6) {
+                valueAxis
+                plot
+            }
+
+            dayAxis
+        }
+    }
+
+    private var valueAxis: some View {
+        VStack(alignment: .trailing, spacing: 0) {
+            Text(Format.tokens(peak))
+            Spacer(minLength: 0)
+            Text(Format.tokens(peak / 2))
+            Spacer(minLength: 0)
+            Text("0")
+        }
+        .font(.system(size: 7.5, design: .rounded))
+        .monospacedDigit()
+        .foregroundStyle(Palette.label)
+        .lineLimit(1)
+        .frame(width: Self.axisWidth, height: Self.plotHeight, alignment: .trailing)
+    }
+
+    /// Bars are sized from the space actually available rather than a fixed
+    /// width, so a long range cannot run off the edge of the panel.
+    private var plot: some View {
+        GeometryReader { proxy in
+            let gap: CGFloat = 3
+            let count = max(days.count, 1)
+            let available = proxy.size.width - gap * CGFloat(count - 1)
+            let width = min(34, max(3, available / CGFloat(count)))
+
+            HStack(alignment: .bottom, spacing: gap) {
                 ForEach(days, id: \.day) { day in
-                    VStack(spacing: 3) {
-                        stackedBar(for: day)
-                        Text(Format.shortDay(day.day))
-                            .font(.system(size: 7))
-                            .foregroundStyle(Palette.label)
-                            .lineLimit(1)
-                            .fixedSize()
-                    }
-                    // Cap the width so one or two active days produce readable
-                    // bars rather than a single block spanning the panel.
-                    .frame(maxWidth: 56)
+                    stackedBar(for: day).frame(width: width)
                 }
                 Spacer(minLength: 0)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(height: Self.plotHeight)
+    }
+
+    /// Only the endpoints are labelled. These are *active* days rather than a
+    /// continuous timeline — they skip the days nothing ran — so a row of
+    /// dates implied a regular interval that does not exist.
+    private var dayAxis: some View {
+        HStack(spacing: 4) {
+            if let first = days.first?.day {
+                Text(Format.shortDay(first))
+            }
+            Spacer(minLength: 0)
+            Text("\(days.count) active days")
+            Spacer(minLength: 0)
+            if let last = days.last?.day, days.count > 1 {
+                Text(Format.shortDay(last))
+            }
+        }
+        .font(.system(size: 7.5, design: .rounded))
+        .foregroundStyle(Palette.label)
+        .lineLimit(1)
+        .padding(.leading, Self.axisWidth + 6)
     }
 
     private func stackedBar(for day: DayStat) -> some View {
-        let height = 96.0 * (peak > 0 ? Double(day.tokens) / Double(peak) : 0)
+        let scaled = Self.plotHeight * (peak > 0 ? Double(day.tokens) / Double(peak) : 0)
+        // A day with real but small usage was drawing as a one-pixel hairline,
+        // which reads as a gap in the data rather than a quiet day.
+        let height = day.tokens > 0 ? max(3, scaled) : 0
         return VStack(spacing: 0) {
             Spacer(minLength: 0)
             ForEach(models) { model in
@@ -239,7 +287,7 @@ struct ModelChart: View {
                 }
             }
         }
-        .frame(height: 96)
+        .frame(height: Self.plotHeight)
         .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
