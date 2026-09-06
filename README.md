@@ -19,7 +19,7 @@ who's working, who's waiting on you, and how much quota is left.
 
 ## Install
 
-1. [**Download Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest) and unzip it.
+1. [**Download Perch 0.2.0**](https://github.com/ctudoudou/Perch/releases/latest) and unzip it.
 2. Drag `Perch.app` into `/Applications`.
 3. Run this once, **before** opening it:
 

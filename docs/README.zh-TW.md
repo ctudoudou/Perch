@@ -19,7 +19,7 @@ Claude Code 與 Codex，始終在餘光可及之處——
 
 ## 安裝
 
-1. [**下載 Perch 0.1.0**](https://github.com/ctudoudou/Perch/releases/latest)，解壓縮。
+1. [**下載 Perch 0.2.0**](https://github.com/ctudoudou/Perch/releases/latest)，解壓縮。
 2. 把 `Perch.app` 拖進 `/Applications`。
 3. 開啟**之前**，先執行這一行：
 
